@@ -1,0 +1,16 @@
+{
+  "name": "tslind_test",
+  "version": "1.0.0",
+  "description": "test",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "tsc --noImplicitAny .\\rules\\testRule.ts &&  tslint source.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "tslint": "^4.3.1",
+    "typescript": "^2.1.5"
+  }
+}
