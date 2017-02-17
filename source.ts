@@ -7,7 +7,7 @@ class Test1 {
     }
 
     public visitImportDeclaration(ss: string) {
-        new this.service.getSth("Text from Test1");
+        this.service.getSth("Text from Test1");
     }
 
 
@@ -19,7 +19,7 @@ class Test2 {
     }
 
     public visitImportDeclaration(ss: string) {
-        new this.service.getSth("Text from Test1");
+        this.service.getSth("Text from Test1");
     }
 }
 
@@ -35,5 +35,8 @@ class Main {
 
 class ApiService {
     public getSth(ss: string) {
+    }
+
+    public getSth2(ss: string) {
     }
 }
