@@ -27,7 +27,7 @@ export class Rule extends Lint.Rules.AbstractRule {
         // console.log(walker.methodNames);
 
         walker.methodNames.filter(x => !x.used).forEach(method => {
-            result.push(new Lint.RuleFailure(sourceFile, 0, 1, `${method.className}.${method.name} method is not used`, "Api methods should be used"));
+            result.push(new Lint.RuleFailure(sourceFile, method.start, method.end, `${method.className}.${method.name} method is not used`, "Api methods should be used"));
         });
 
         return result;
@@ -38,14 +38,17 @@ class NoImportsWalker extends Lint.RuleWalker {
     public methodNames: MethodDefinition[] = [];
     public methodExecutions: MethodAccess[] = [];
     public injectedObjects: InjectedObject[] = [];
+    public apiClassNames: string[] = ["ApiService"];
 
     protected visitMethodDeclaration(node: ts.MethodDeclaration): void {
         if (node.parent.kind === ts.SyntaxKind.ClassDeclaration) {
             let classDeclaration: ts.ClassDeclaration = node.parent as ts.ClassDeclaration;
-            if (classDeclaration.name.text === "ApiService") {
+            if (this.apiClassNames.indexOf(classDeclaration.name.text) > -1) {
                 this.methodNames.push({
                     name: node.name.getText(),
-                    className: classDeclaration.name.text
+                    className: classDeclaration.name.text,
+                    start: node.getStart(),
+                    end: node.getEnd()
                 });
             }
         }
@@ -97,6 +100,8 @@ class NoImportsWalker extends Lint.RuleWalker {
 class MethodDefinition {
     name: string;
     className: string;
+    start: number;
+    end: number;
     used?: boolean = false;
 }
 

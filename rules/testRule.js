@@ -27,17 +27,16 @@ var Rule = (function (_super) {
                 methodName.used = true;
             }
         });
-        console.log('Processed method names');
-        console.log(walker.methodNames);
+        // console.log('Processed method names');
+        // console.log(walker.methodNames);
         walker.methodNames.filter(function (x) { return !x.used; }).forEach(function (method) {
-            result.push(new Lint.RuleFailure(sourceFile, 0, 1, method.className + "." + method.name + " method is not used", "Api methods should be used"));
+            result.push(new Lint.RuleFailure(sourceFile, method.start, method.end, method.className + "." + method.name + " method is not used", "Api methods should be used"));
         });
         return result;
     };
     return Rule;
 }(Lint.Rules.AbstractRule));
 exports.Rule = Rule;
-// The walker takes care of all the work.
 var NoImportsWalker = (function (_super) {
     __extends(NoImportsWalker, _super);
     function NoImportsWalker() {
@@ -45,25 +44,18 @@ var NoImportsWalker = (function (_super) {
         _this.methodNames = [];
         _this.methodExecutions = [];
         _this.injectedObjects = [];
+        _this.apiClassNames = ["ApiService"];
         return _this;
     }
-    // protected visitCallSignature(node: ts.SignatureDeclaration) {
-    //     console.log("Hey");
-    //     //console.log(node.getStart());
-    //     this.walkChildren(node);
-    // }
-    // protected visitMethodSignature(node: ts.SignatureDeclaration) {
-    //     console.log("method");
-    //     this.addFailure(this.createFailure(node.getStart(), node.getWidth(), Rule.FAILURE_STRING));
-    //     this.walkChildren(node);
-    // }
     NoImportsWalker.prototype.visitMethodDeclaration = function (node) {
         if (node.parent.kind === ts.SyntaxKind.ClassDeclaration) {
             var classDeclaration = node.parent;
-            if (classDeclaration.name.text === "ApiService") {
+            if (this.apiClassNames.indexOf(classDeclaration.name.text) > -1) {
                 this.methodNames.push({
                     name: node.name.getText(),
-                    className: classDeclaration.name.text
+                    className: classDeclaration.name.text,
+                    start: node.getStart(),
+                    end: node.getEnd()
                 });
             }
         }
