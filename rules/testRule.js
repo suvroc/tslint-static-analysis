@@ -27,11 +27,11 @@ var Rule = (function (_super) {
                 methodName.used = true;
             }
         });
-        // console.log('Processed method names');
-        // console.log(walker.methodNames);
-        walker.methodNames.filter(function (x) { return !x.used; }).forEach(function (method) {
-            result.push(new Lint.RuleFailure(sourceFile, method.start, method.end, method.className + "." + method.name + " method is not used", "Api methods should be used"));
-        });
+        console.log('Processed method names');
+        console.log(walker.methodNames.filter(function (x) { return x.used; }));
+        // walker.methodNames.filter(x => !x.used).forEach(method => {
+        //     result.push(new Lint.RuleFailure(sourceFile, method.start, method.end, `${method.className}.${method.name} method is not used`, "Api methods should be used"));
+        // });
         return result;
     };
     return Rule;
@@ -44,22 +44,30 @@ var NoImportsWalker = (function (_super) {
         _this.methodNames = [];
         _this.methodExecutions = [];
         _this.injectedObjects = [];
-        _this.apiClassNames = ["ApiService"];
+        //public apiClassNames: string[] = ["ApiService"];
+        _this.baseServiceClassName = "BaseService";
         return _this;
+        // protected visitNode(node: ts.Node) {
+        //     console.log(node);
+        //     this.walkChildren(node);
+        // }
     }
     NoImportsWalker.prototype.visitMethodDeclaration = function (node) {
         if (node.parent.kind === ts.SyntaxKind.ClassDeclaration) {
             var classDeclaration = node.parent;
-            if (this.apiClassNames.indexOf(classDeclaration.name.text) > -1) {
+            if (classDeclaration.heritageClauses) {
+                //if (this.apiClassNames.indexOf(classDeclaration.name.text) > -1) {
                 this.methodNames.push({
                     name: node.name.getText(),
-                    className: classDeclaration.name.text,
-                    start: node.getStart(),
-                    end: node.getEnd()
+                    className: classDeclaration.name.text
                 });
             }
         }
         this.walkChildren(node);
+    };
+    NoImportsWalker.prototype.getBaseClasess = function (heritageClauses) {
+        return heritageClauses.filter(function (x) { return x.token === ts.SyntaxKind.ExtendsKeyword; })
+            .reduce(function (prev, current) { return prev.concat(current.types.map(function (y) { return y.expression.getText(); })); }, []);
     };
     NoImportsWalker.prototype.visitPropertyAccessExpression = function (node) {
         if (node.parent.kind === ts.SyntaxKind.CallExpression) {
@@ -105,7 +113,6 @@ var NoImportsWalker = (function (_super) {
 }(Lint.RuleWalker));
 var MethodDefinition = (function () {
     function MethodDefinition() {
-        this.used = false;
     }
     return MethodDefinition;
 }());

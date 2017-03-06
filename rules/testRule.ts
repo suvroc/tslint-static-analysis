@@ -23,12 +23,12 @@ export class Rule extends Lint.Rules.AbstractRule {
             }
         });
 
-        // console.log('Processed method names');
-        // console.log(walker.methodNames);
+        console.log('Processed method names');
+        console.log(walker.methodNames.filter(x => x.used));
 
-        walker.methodNames.filter(x => !x.used).forEach(method => {
-            result.push(new Lint.RuleFailure(sourceFile, method.start, method.end, `${method.className}.${method.name} method is not used`, "Api methods should be used"));
-        });
+        // walker.methodNames.filter(x => !x.used).forEach(method => {
+        //     result.push(new Lint.RuleFailure(sourceFile, method.start, method.end, `${method.className}.${method.name} method is not used`, "Api methods should be used"));
+        // });
 
         return result;
     }
@@ -38,21 +38,27 @@ class NoImportsWalker extends Lint.RuleWalker {
     public methodNames: MethodDefinition[] = [];
     public methodExecutions: MethodAccess[] = [];
     public injectedObjects: InjectedObject[] = [];
-    public apiClassNames: string[] = ["ApiService"];
+    //public apiClassNames: string[] = ["ApiService"];
+    public baseServiceClassName: string = "BaseService";
 
     protected visitMethodDeclaration(node: ts.MethodDeclaration): void {
         if (node.parent.kind === ts.SyntaxKind.ClassDeclaration) {
             let classDeclaration: ts.ClassDeclaration = node.parent as ts.ClassDeclaration;
-            if (this.apiClassNames.indexOf(classDeclaration.name.text) > -1) {
+            if (classDeclaration.heritageClauses) {
+               //if (this.apiClassNames.indexOf(classDeclaration.name.text) > -1) {
                 this.methodNames.push({
                     name: node.name.getText(),
-                    className: classDeclaration.name.text,
-                    start: node.getStart(),
-                    end: node.getEnd()
+                    className: classDeclaration.name.text
                 });
+            //}
             }
         }
         this.walkChildren(node);
+    }
+
+    private getBaseClasess(heritageClauses: ts.NodeArray<ts.HeritageClause>): string[] {
+        return heritageClauses.filter(x => x.token === ts.SyntaxKind.ExtendsKeyword)
+                .reduce((prev: any[], current: ts.HeritageClause) => prev.concat(current.types.map(y => y.expression.getText())), []);
     }
 
     protected visitPropertyAccessExpression(node: ts.PropertyAccessExpression): void {
@@ -95,14 +101,17 @@ class NoImportsWalker extends Lint.RuleWalker {
         }
         this.walkChildren(node);
     }
+
+    // protected visitNode(node: ts.Node) {
+    //     console.log(node);
+    //     this.walkChildren(node);
+    // }
 }
 
 class MethodDefinition {
     name: string;
     className: string;
-    start: number;
-    end: number;
-    used?: boolean = false;
+    used?: boolean;
 }
 
 class MethodAccess {

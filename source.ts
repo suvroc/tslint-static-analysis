@@ -33,10 +33,14 @@ class Main {
     }
 }
 
-class ApiService {
+class BaseService {
+}
+
+class ApiService extends BaseService {
     public getSth(ss: string) {
     }
 
     public getSth2(ss: string) {
     }
 }
+
