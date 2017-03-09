@@ -6,6 +6,9 @@ var __extends = (this && this.__extends) || function (d, b) {
 };
 var ts = require("typescript");
 var Lint = require("tslint");
+var fs = require("fs");
+// import * as conf from '../../package.json';
+var pkgInfo = require('../../package.json');
 var Rule = (function (_super) {
     __extends(Rule, _super);
     function Rule() {
@@ -14,25 +17,34 @@ var Rule = (function (_super) {
     Rule.prototype.apply = function (sourceFile) {
         var walker = new NoImportsWalker(sourceFile, this.getOptions());
         var result = this.applyWithWalker(walker);
-        // console.log('Method Names');
+        // console.log('Method Names ( ' + sourceFile.fileName + ' )');
         // console.log(walker.methodNames);
         // console.log('Method Executions');
         // console.log(walker.methodExecutions);
         // console.log('Injected');
         // console.log(walker.injectedObjects);
         walker.methodExecutions.forEach(function (method) {
-            var injectedObject = walker.injectedObjects.filter(function (obj) { return obj.className === method.className && obj.objectName === method.objectName; })[0];
+            var injectedObject = walker.injectedObjects.filter(function (obj) { return obj.className === method.className && obj.objectName === method.objectName.replace("this.", ""); })[0];
             if (injectedObject) {
                 var methodName = walker.methodNames.filter(function (name) { return name.className === injectedObject.typeName && name.name === method.methodName; })[0];
-                methodName.used = true;
+                if (methodName) {
+                    methodName.used = true;
+                }
             }
         });
-        console.log('Processed method names');
-        console.log(walker.methodNames.filter(function (x) { return x.used; }));
-        // walker.methodNames.filter(x => !x.used).forEach(method => {
-        //     result.push(new Lint.RuleFailure(sourceFile, method.start, method.end, `${method.className}.${method.name} method is not used`, "Api methods should be used"));
-        // });
+        // console.log('Processed method names');
+        // console.log(walker.methodNames.filter(x => x.used));
+        this.saveResults(walker.methodNames.filter(function (x) { return x.used; }));
         return result;
+    };
+    Rule.prototype.saveResults = function (data) {
+        var fileName = pkgInfo.bc['dependency-file'] || 'dependency.json';
+        fs.writeFile(fileName, JSON.stringify(data), function (err) {
+            if (err) {
+                return console.log(err);
+            }
+            //console.log("The file was saved!");
+        });
     };
     return Rule;
 }(Lint.Rules.AbstractRule));
@@ -44,19 +56,13 @@ var NoImportsWalker = (function (_super) {
         _this.methodNames = [];
         _this.methodExecutions = [];
         _this.injectedObjects = [];
-        //public apiClassNames: string[] = ["ApiService"];
         _this.baseServiceClassName = "BaseService";
         return _this;
-        // protected visitNode(node: ts.Node) {
-        //     console.log(node);
-        //     this.walkChildren(node);
-        // }
     }
     NoImportsWalker.prototype.visitMethodDeclaration = function (node) {
         if (node.parent.kind === ts.SyntaxKind.ClassDeclaration) {
             var classDeclaration = node.parent;
-            if (classDeclaration.heritageClauses) {
-                //if (this.apiClassNames.indexOf(classDeclaration.name.text) > -1) {
+            if (classDeclaration && classDeclaration.heritageClauses && this.getBaseClasses(classDeclaration.heritageClauses).indexOf(this.baseServiceClassName) > -1) {
                 this.methodNames.push({
                     name: node.name.getText(),
                     className: classDeclaration.name.text
@@ -65,33 +71,23 @@ var NoImportsWalker = (function (_super) {
         }
         this.walkChildren(node);
     };
-    NoImportsWalker.prototype.getBaseClasess = function (heritageClauses) {
-        return heritageClauses.filter(function (x) { return x.token === ts.SyntaxKind.ExtendsKeyword; })
-            .reduce(function (prev, current) { return prev.concat(current.types.map(function (y) { return y.expression.getText(); })); }, []);
-    };
     NoImportsWalker.prototype.visitPropertyAccessExpression = function (node) {
         if (node.parent.kind === ts.SyntaxKind.CallExpression) {
             var expressionText = void 0;
-            if (node.expression.kind === 177) {
-                var propertyAccess = node.expression;
-                expressionText = propertyAccess.name.text;
+            expressionText = node.expression.getText();
+            var classParent = node;
+            while ((classParent = classParent.parent) && (classParent.kind !== ts.SyntaxKind.ClassDeclaration)) 
+            // tslint:disable-next-line:no-empty
+            {
             }
-            else if (node.expression.kind === 70) {
-                var identifier = node.expression;
-                expressionText = identifier.text;
+            var parentNode = classParent;
+            if (parentNode) {
+                this.methodExecutions.push({
+                    objectName: expressionText,
+                    methodName: node.name.text,
+                    className: parentNode.name.text
+                });
             }
-            else if (node.expression.kind === 98) {
-                expressionText = "this";
-            }
-            var parent_1 = node;
-            while ((parent_1 = parent_1.parent) && (parent_1.kind !== ts.SyntaxKind.ClassDeclaration)) {
-            }
-            var parentNode = parent_1;
-            this.methodExecutions.push({
-                objectName: expressionText,
-                methodName: node.name.text,
-                className: parentNode.name.text
-            });
         }
         this.walkChildren(node);
     };
@@ -99,20 +95,36 @@ var NoImportsWalker = (function (_super) {
         var _this = this;
         if (node.parent.kind === ts.SyntaxKind.ClassDeclaration) {
             var classDeclaration_1 = node.parent;
-            node.parameters.forEach(function (parameter) {
-                _this.injectedObjects.push({
-                    className: classDeclaration_1.name.text,
-                    objectName: parameter.name.getText(),
-                    typeName: parameter.type.getText()
+            if (classDeclaration_1) {
+                node.parameters.forEach(function (parameter) {
+                    if (parameter) {
+                        _this.injectedObjects.push({
+                            className: classDeclaration_1.name.text,
+                            objectName: parameter.name.getText(),
+                            typeName: parameter.type.getText()
+                        });
+                    }
                 });
-            });
+            }
         }
         this.walkChildren(node);
+    };
+    NoImportsWalker.prototype.visitNode = function (node) {
+        console.log(node);
+        this.walkChildren(node);
+    };
+    NoImportsWalker.prototype.getBaseClasses = function (heritageClauses) {
+        return heritageClauses.filter(function (x) { return x.token === ts.SyntaxKind.ExtendsKeyword; })
+            .reduce(function (prev, current) { return prev.concat(current.types.map(function (y) { return y.expression.getText(); })); }, []);
     };
     return NoImportsWalker;
 }(Lint.RuleWalker));
 var MethodDefinition = (function () {
+    /**
+     *
+     */
     function MethodDefinition() {
+        this.used = false;
     }
     return MethodDefinition;
 }());
